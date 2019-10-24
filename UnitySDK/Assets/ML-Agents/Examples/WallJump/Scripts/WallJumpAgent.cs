@@ -23,8 +23,10 @@ public class WallJumpAgent : Agent
 
     // public GameObject goal;
     public GameObject shortBlock;
+    public GameObject hazard;
     public GameObject wall;
     Rigidbody m_ShortBlockRb;
+    Rigidbody m_HazardRb;
     Rigidbody m_AgentRb;
     Material m_GroundMaterial;
     Renderer m_GroundRenderer;
@@ -56,10 +58,11 @@ public class WallJumpAgent : Agent
         m_Academy = FindObjectOfType<WallJumpAcademy>();
         m_RayPer = GetComponent<RayPerception>();
         m_Configuration = Random.Range(0, 5);
-        m_DetectableObjects = new[] { "wall", "goal", "block" };
+        m_DetectableObjects = new[] { "wall", "goal", "block", "hazard" };
 
         m_AgentRb = GetComponent<Rigidbody>();
         m_ShortBlockRb = shortBlock.GetComponent<Rigidbody>();
+        m_HazardRb = hazard.GetComponent<Rigidbody>();
         m_SpawnAreaBounds = spawnArea.GetComponent<Collider>().bounds;
         m_GroundRenderer = ground.GetComponent<Renderer>();
         m_GroundMaterial = m_GroundRenderer.material;
@@ -204,7 +207,7 @@ public class WallJumpAgent : Agent
     IEnumerator GoalScoredSwapGroundMaterial(Material mat, float time)
     {
         m_GroundRenderer.material = mat;
-        yield return new WaitForSeconds(time); //wait for 2 sec
+        yield return new WaitForSeconds(time);
         m_GroundRenderer.material = m_GroundMaterial;
     }
 
@@ -378,16 +381,28 @@ public class WallJumpAgent : Agent
         MoveAgent(vectorAction);
         // if ((!Physics.Raycast(m_AgentRb.position, Vector3.down, 20))
         //     || (!Physics.Raycast(m_ShortBlockRb.position, Vector3.down, 20)))
-        if(m_AgentRb.position.y < -1 || m_ShortBlockRb.position.y < -1)
+        if(m_AgentRb.position.y < -1 || m_ShortBlockRb.position.y < -1 || m_HazardRb.position.y < -1)
         {
             Done();
             SetReward(-1f);
             ResetBlock(m_ShortBlockRb);
+            ResetBlock(m_HazardRb);
             StartCoroutine(
                 GoalScoredSwapGroundMaterial(m_Academy.failMaterial, .5f));
         }
     }
 
+    // Detect when the agent hits a hazard
+    void OnCollisionEnter(Collision col)
+    {
+        if (col.gameObject.CompareTag("hazard"))
+        {
+            SetReward(-1f);
+            StartCoroutine(
+                GoalScoredSwapGroundMaterial(m_Academy.failMaterial, .5f));
+            Done();
+        }
+    }
     // Detect when the agent hits the goal
     // void OnTriggerEnter(Collider col)
     void OnTriggerStay(Collider col)
@@ -397,7 +412,7 @@ public class WallJumpAgent : Agent
         {
             SetReward(1f);
             StartCoroutine(
-                GoalScoredSwapGroundMaterial(m_Academy.goalScoredMaterial, 2));
+                GoalScoredSwapGroundMaterial(m_Academy.goalScoredMaterial, .5f));
             Done();
         }
     }
@@ -413,6 +428,8 @@ public class WallJumpAgent : Agent
     public override void AgentReset()
     {
         ResetBlock(m_ShortBlockRb);
+        ResetBlock(m_HazardRb);
+
         transform.localPosition = new Vector3(
             18 * (Random.value - 0.5f), 1, -12);
         m_Configuration = Random.Range(0, 5);
